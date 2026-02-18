@@ -1,3 +1,7 @@
+'use client';
+
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+
 const mustHave = [
   'Import photo + scan capture',
   'Page detection + perspective correction',
@@ -44,7 +48,66 @@ const onboarding = [
   'Success → optional flashcards and practice-question generation.'
 ];
 
+const demoExtraction = {
+  title: 'Bats',
+  metadata: [
+    'Title: Notes',
+    'Date: 2/17/26',
+    'Class: HOME',
+    'Definition: Bat = animal'
+  ],
+  bullets: ['fly', 'can make sounds', 'usually black'],
+  summary: 'Bats are animals that can fly and communicate with sounds. Their color is often black.'
+};
+
+const supportedFileHint = 'Accepted formats: JPG, PNG, HEIC, PDF.';
+
 export default function HomePage() {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isDemoVisible, setIsDemoVisible] = useState(false);
+
+  const fileLabel = useMemo(() => {
+    if (!selectedFile) {
+      return 'No file selected yet';
+    }
+
+    const sizeInMb = (selectedFile.size / (1024 * 1024)).toFixed(2);
+    return `${selectedFile.name} (${sizeInMb} MB)`;
+  }, [selectedFile]);
+
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handlePickerOpen = () => {
+    inputRef.current?.click();
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedFile(file);
+
+    if (!file || !file.type.startsWith('image/')) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl((currentPreviewUrl) => {
+      if (currentPreviewUrl) {
+        URL.revokeObjectURL(currentPreviewUrl);
+      }
+      return objectUrl;
+    });
+  };
+
   return (
     <main className="page">
       <section className="hero card">
@@ -56,12 +119,65 @@ export default function HomePage() {
           while surfacing uncertainty through a human review queue.
         </p>
         <div className="actions">
-          <button type="button">New Scan</button>
-          <button type="button" className="secondary">
-            See Demo Workflow
+          <button type="button" onClick={handlePickerOpen}>
+            New Scan
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setIsDemoVisible((currentState) => !currentState)}
+          >
+            {isDemoVisible ? 'Hide Demo Workflow' : 'See Demo Workflow'}
           </button>
         </div>
+        <input
+          ref={inputRef}
+          className="fileInput"
+          type="file"
+          accept="image/*,.pdf"
+          onChange={handleFileChange}
+        />
+        <p className="fileHint">{supportedFileHint}</p>
+        <p className="fileStatus">Upload status: {fileLabel}</p>
+        {previewUrl ? (
+          <figure className="previewCard">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt="Uploaded scan preview" className="previewImage" />
+            <figcaption>Preview of uploaded scan</figcaption>
+          </figure>
+        ) : null}
       </section>
+
+      {isDemoVisible ? (
+        <section className="card">
+          <h2>Demo Workflow (from your sample notes)</h2>
+          <div className="demoGrid">
+            <article className="tile">
+              <h3>Detected metadata</h3>
+              <ul>
+                {demoExtraction.metadata.map((entry) => (
+                  <li key={entry}>{entry}</li>
+                ))}
+              </ul>
+            </article>
+            <article className="tile">
+              <h3>Main heading</h3>
+              <p className="demoTitle">{demoExtraction.title}</p>
+              <h3>Bullets</h3>
+              <ul>
+                {demoExtraction.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+            </article>
+            <article className="tile">
+              <h3>Compiler summary</h3>
+              <p>{demoExtraction.summary}</p>
+              <p className="confidence">Confidence: 0.93 (handwriting + structure checks passed)</p>
+            </article>
+          </div>
+        </section>
+      ) : null}
 
       <section className="card">
         <h2>Compiler-style pipeline</h2>
